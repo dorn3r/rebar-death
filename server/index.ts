@@ -69,7 +69,6 @@ const Internal = {
         }
 
         const victimData = Rebar.document.character.useCharacter(victim);
-        const document = victimData.get();
         if (!victimData) {
             return;
         }
