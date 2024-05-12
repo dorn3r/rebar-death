@@ -1,7 +1,14 @@
 import * as alt from 'alt-server';
 import { useRebar } from '@Server/index.js';
+import { Character } from '@Shared/types/character.js';
+import * as Utility from '@Shared/utility/index.js';
 
 const Rebar = useRebar();
+const api = Rebar.useApi();
+
+const TimeOfDeath: { [_id: string]: number } = {};
+
+
 
 const HOSPITALS = [
     { x: -248.01309204101562, y: 6332.01513671875, z: 33.0750732421875 },
@@ -12,6 +19,18 @@ const HOSPITALS = [
 ];
 
 const Internal = {
+    handleCharacterSelected(player: alt.Player, character: Character) {
+        if( character.isDead) {
+            player.health = 99;
+            TimeOfDeath[character._id.toString()] = Date.now() + 30000;
+            alt.emitClient(player, 'update:death:time:left', TimeOfDeath[character._id.toString()] - Date.now());
+            alt.emitClient(player, 'death:timer');
+            alt.setTimeout(() => {
+                Internal.respawn(player);
+            }, 30000);
+        }
+    },
+
     /**
      * Returns the closest hospital position.
      *
@@ -20,8 +39,8 @@ const Internal = {
      */
     getClosestHospital(pos: alt.IVector3): alt.IVector3 {
         const sortedByDistance = HOSPITALS.sort((a, b) => {
-            const distA = distance2d(pos, a);
-            const distB = distance2d(pos, b);
+            const distA = Utility.vector.distance(pos, a);
+            const distB = Utility.vector.distance(pos, b);
             return distA - distB;
         });
 
@@ -57,23 +76,28 @@ const Internal = {
     },
 
     /**
-     * Respawns the player after 5 seconds in their same position.
+     * Respawns the player after 30 seconds in their same position.
      *
      * @param {alt.Player} victim
      * @return {void}
      */
     handleDefaultDeath(victim: alt.Player) {
-
+        
         if (!victim || !victim.valid) {
             return;
         }
 
         const victimData = Rebar.document.character.useCharacter(victim);
+        const character = victimData.get();
         if (!victimData) {
             return;
         }
 
         victimData.set('isDead', true);
+
+        TimeOfDeath[character._id.toString()] = Date.now() + 30000;
+        alt.emitClient(victim, 'update:death:time:left', TimeOfDeath[character._id.toString()] - Date.now());
+        alt.emitClient(victim, 'death:timer');
 
         alt.setTimeout(() => {
             if (!victim || !victim.valid) {
@@ -81,20 +105,17 @@ const Internal = {
             }
 
             Internal.respawn(victim);
-        }, 5000);
-    },
-
-    distance2d(vector1: alt.IVector2, vector2: alt.IVector2): number {
-        if (vector1 === undefined || vector2 === undefined) {
-            throw new Error('AddVector => vector1 or vector2 is undefined');
-        }
-    
-        return Math.sqrt(Math.pow(vector1.x - vector2.x, 2) + Math.pow(vector1.y - vector2.y, 2));
+        }, 30000);
     },
     
-    init() {
-        alt.on('playerDeath', Internal.handleDefaultDeath);
-    },
 };
 
-Internal.init();
+
+async function init() {
+    await alt.Utils.waitFor(() => api.isReady('character-select-api'), 30000);
+    const charSelectApi = api.get('character-select-api');
+    charSelectApi.onSelect(Internal.handleCharacterSelected);
+    alt.on('playerDeath', Internal.handleDefaultDeath);
+}
+
+init();
