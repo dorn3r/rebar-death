@@ -7,6 +7,7 @@ const Rebar = useRebar();
 const api = Rebar.useApi();
 
 const TimeOfDeath: { [_id: string]: number } = {};
+const respawntime = 30000 as number;
 
 
 
@@ -22,12 +23,12 @@ const Internal = {
     handleCharacterSelected(player: alt.Player, character: Character) {
         if( character.isDead) {
             player.health = 99;
-            TimeOfDeath[character._id.toString()] = Date.now() + 30000;
+            TimeOfDeath[character._id.toString()] = Date.now() + respawntime;
             alt.emitClient(player, 'update:death:time:left', TimeOfDeath[character._id.toString()] - Date.now());
             alt.emitClient(player, 'death:timer');
             alt.setTimeout(() => {
                 Internal.respawn(player);
-            }, 30000);
+            }, respawntime);
         }
     },
 
@@ -95,7 +96,7 @@ const Internal = {
 
         victimData.set('isDead', true);
 
-        TimeOfDeath[character._id.toString()] = Date.now() + 30000;
+        TimeOfDeath[character._id.toString()] = Date.now() + respawntime;
         alt.emitClient(victim, 'update:death:time:left', TimeOfDeath[character._id.toString()] - Date.now());
         alt.emitClient(victim, 'death:timer');
 
@@ -105,7 +106,7 @@ const Internal = {
             }
 
             Internal.respawn(victim);
-        }, 30000);
+        }, respawntime);
     },
     
 };
